@@ -1,5 +1,5 @@
 import { Parser, Tokenizer } from "./index.js";
-import type { Handler } from "./Parser.js";
+import type { Handler, ParserOptions } from "./Parser.js";
 
 describe("API", () => {
     test("should work without callbacks", () => {
@@ -160,4 +160,50 @@ describe("API", () => {
         );
         p.done();
     });
+
+    describe('should apply default values correctly with or without xmlMode', () => {
+        
+        let actual : (string | { [s: string]: string | boolean } | boolean)[] = [];
+        
+        const handler: Partial<Handler> = {
+            onreset: () => actual = [],
+            onopentagname: tag => actual.push({ tag }),
+            onattribute: attribute => actual.push({ attr: attribute }),
+            ontext: text => actual.push({ text }),
+            onclosetag: (_, implied) => actual.push({ implied })
+        };
+
+        const testOptions = (options : ParserOptions) => {
+            const p = new Parser(handler, options);
+            p.parseComplete(`<Component/><input maxLength="10">&nbsp;<![CDATA[test]]]>`);
+            
+            expect(actual).toEqual([
+                { tag: 'component' },
+                { tag: 'input' },
+                { attr: 'maxLength' },
+                { implied: true },
+                { text: "\u00A0" },
+                { implied: true }
+            ]);
+        }
+
+        test("when explicitly set", () => {
+            testOptions({
+                decodeEntities: true,
+                lowerCaseTags: true,
+                lowerCaseAttributeNames: false,
+                recognizeCDATA: false,
+                recognizeSelfClosing: false,
+            });
+        });
+        test("when xmlMode is false", () => {
+            testOptions({
+                xmlMode: false
+            });
+        });
+        test("when pure defaults used", () => {
+            testOptions({});
+        });
+    });
 });
+
